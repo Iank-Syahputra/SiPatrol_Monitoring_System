@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Plus, Download, Printer } from "lucide-react";
-import { useUser } from '@clerk/nextjs';
+import AdminSidebar from '@/components/admin-sidebar';
 
 export default function ManageUnitsPage() {
   const [units, setUnits] = useState<any[]>([]);
@@ -11,7 +11,6 @@ export default function ManageUnitsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useUser();
 
   // Fetch units from API
   useEffect(() => {
@@ -107,46 +106,7 @@ export default function ManageUnitsPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex">
       {/* Sidebar Navigation */}
-      <div className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col">
-        <div className="p-6 border-b border-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <Shield className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-xl font-bold">Command Center</h1>
-          </div>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          <a href="/admin/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white">
-            <Activity className="h-5 w-5" />
-            <span>Live Feed</span>
-          </a>
-          <a href="/admin/reports" className="flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white">
-            <FileText className="h-5 w-5" />
-            <span>Report Management</span>
-          </a>
-          <a href="/admin/units" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-600 text-white">
-            <Building className="h-5 w-5" />
-            <span>Manage Units</span>
-          </a>
-          <a href="/admin/users" className="flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white">
-            <User className="h-5 w-5" />
-            <span>Manage Users</span>
-          </a>
-        </nav>
-
-        <div className="p-4 border-t border-zinc-800">
-          <div className="flex items-center gap-3 px-2">
-            <div className="p-2 bg-zinc-800 rounded-lg">
-              <User className="h-4 w-4 text-zinc-400" />
-            </div>
-            <span className="text-sm font-medium text-zinc-200">
-              {user?.firstName || user?.username || "Admin"}
-            </span>
-          </div>
-        </div>
-      </div>
+      <AdminSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
