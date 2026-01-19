@@ -44,15 +44,25 @@ export default function ReportForm({ user }: { user: any }) {
             
             {/* 1. Camera Input */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Evidence</label>
-              <div className="relative group cursor-pointer">
+              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Evidence
+              </label>
+
+              <label className="relative group cursor-pointer block">
                 <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+
                 <div className="border-2 border-dashed border-zinc-700 rounded-xl p-8 flex flex-col items-center justify-center text-zinc-400 group-hover:border-blue-500 group-hover:text-blue-400 transition-all bg-zinc-900/50">
                   <Camera className="w-10 h-10 mb-3" />
                   <span className="font-medium">Tap to capture photo</span>
-                  <input type="file" accept="image/*" capture="environment" className="hidden" />
                 </div>
-              </div>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                />
+              </label>
             </div>
 
             {/* 2. Notes Input */}
