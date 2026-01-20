@@ -17,15 +17,23 @@ export default async function AdminLayout({
     redirect('/sign-in?redirect_url=/admin/dashboard');
   }
 
-  // 2. Fetch User Role from Database
+  // 2. Fetch User Profile from Database
   const profile = await getUserProfile();
 
-  // 3. THE LOGIC: Check if Admin
-  if (profile?.role !== 'admin') {
+  // 3. STRICT DATABASE SYNC: Check if profile exists
+  if (!profile) {
+    // Profile was deleted in Supabase -> Force logout
+    // We'll render a client component that performs the logout
+    const ForceLogout = (await import('@/components/force-logout')).default;
+    return <ForceLogout />;
+  }
+
+  // 4. Check if Admin role
+  if (profile.role !== 'admin') {
     // User logged in, but WRONG ROLE -> Show Error Screen
     return <AdminForbidden />;
   }
 
-  // 4. User is Admin -> Show Dashboard
+  // 5. User is Admin -> Show Dashboard
   return <>{children}</>;
 }

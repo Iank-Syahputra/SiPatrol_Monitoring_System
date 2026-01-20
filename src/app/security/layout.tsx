@@ -10,8 +10,16 @@ export default async function SecurityLayout({
   // SERVER SIDE: Fetch data here
   const user = await getUserProfile();
 
-  // Check if user exists and has security role
-  if (!user || user.role !== 'security') {
+  // STRICT DATABASE SYNC: Check if profile exists
+  if (!user) {
+    // Profile was deleted in Supabase -> Force logout
+    // We'll render a client component that performs the logout
+    const ForceLogout = (await import('@/components/force-logout')).default;
+    return <ForceLogout />;
+  }
+
+  // Check if user has security role
+  if (user.role !== 'security') {
     redirect('/'); // Redirect if not a security user
   }
 

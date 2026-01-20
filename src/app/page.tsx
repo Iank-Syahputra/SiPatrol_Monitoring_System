@@ -67,7 +67,7 @@ export default async function Home() {
               Access point for field officers to report incidents, check-in, and submit patrol findings.
             </p>
             <Link
-              href="/sign-in?redirect_url=/onboarding"
+              href="/sign-in?redirect_url=/check-auth"
               className="mt-auto w-full bg-white text-black py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
             >
               Access Portal
