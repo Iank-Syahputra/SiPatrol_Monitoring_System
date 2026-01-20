@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Camera } from 'lucide-react';
+import { X, MapPin, Camera, ExternalLink } from 'lucide-react';
 
 interface ReportDetailsModalProps {
   report: any;
@@ -20,6 +20,23 @@ export default function ReportDetailsModal({ report, isOpen, onClose }: ReportDe
   if (!isMounted || !isOpen || !report) {
     return null;
   }
+
+  // Handle coordinate mapping (database might use different field names)
+  const latitude = report.lat || report.latitude || report.profiles?.lat || report.profiles?.latitude;
+  const longitude = report.lng || report.longitude || report.profiles?.lng || report.profiles?.longitude;
+
+  // Format the captured timestamp
+  const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    };
+    return new Date(dateString).toLocaleString(undefined, options);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -44,8 +61,25 @@ export default function ReportDetailsModal({ report, isOpen, onClose }: ReportDe
                 <Camera className="w-4 h-4" />
                 Photo Evidence
               </h4>
-              <div className="bg-zinc-800 border-2 border-dashed border-zinc-700 rounded-xl w-full h-64 flex items-center justify-center">
-                <span className="text-zinc-500">Photo Preview</span>
+              <div className="bg-zinc-800 border border-zinc-700 rounded-xl w-full h-64 flex items-center justify-center overflow-hidden">
+                {report.image_path || report.imageData || report.photo_url ? (
+                  <img
+                    src={report.image_path || report.imageData || report.photo_url}
+                    alt="Report evidence"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // If image fails to load, show fallback
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement?.querySelector('.fallback-content');
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : (
+                  <div className="fallback-content w-full h-full flex flex-col items-center justify-center text-zinc-500">
+                    <Camera className="w-12 h-12 mb-2" />
+                    <p>No Photo Available</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -55,10 +89,10 @@ export default function ReportDetailsModal({ report, isOpen, onClose }: ReportDe
                 <h4 className="font-semibold text-white mb-2">Officer Information</h4>
                 <div className="bg-zinc-800/50 rounded-lg p-3">
                   <p className="text-sm text-zinc-300">
-                    <span className="text-zinc-400">Name:</span> {report.profiles?.full_name || 'N/A'}
+                    <span className="text-zinc-400">Name:</span> {report.profiles?.full_name || report.profiles?.name || 'N/A'}
                   </p>
                   <p className="text-sm text-zinc-300">
-                    <span className="text-zinc-400">Unit:</span> {report.units?.name || 'N/A'}
+                    <span className="text-zinc-400">Unit:</span> {report.units?.name || report.unit?.name || 'N/A'}
                   </p>
                 </div>
               </div>
@@ -68,11 +102,25 @@ export default function ReportDetailsModal({ report, isOpen, onClose }: ReportDe
                 <div className="bg-zinc-800/50 rounded-lg p-3 flex items-start gap-2">
                   <MapPin className="w-4 h-4 text-blue-400 mt-0.5" />
                   <div>
-                    <p className="text-sm text-zinc-300">
-                      {report.latitude && report.longitude 
-                        ? `${report.latitude.toFixed(6)}, ${report.longitude.toFixed(6)}` 
-                        : 'Location not available'}
-                    </p>
+                    {latitude && longitude ? (
+                      <>
+                        <p className="text-sm text-zinc-300">
+                          {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                        </p>
+                        <a
+                          href={`https://www.google.com/maps?q=${latitude},${longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-1"
+                        >
+                          Open in Maps <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </>
+                    ) : (
+                      <p className="text-sm text-zinc-300">
+                        Location not available
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -81,7 +129,7 @@ export default function ReportDetailsModal({ report, isOpen, onClose }: ReportDe
                 <h4 className="font-semibold text-white mb-2">Timestamp</h4>
                 <div className="bg-zinc-800/50 rounded-lg p-3">
                   <p className="text-sm text-zinc-300">
-                    {new Date(report.captured_at).toLocaleString()}
+                    {report.captured_at ? formatDate(report.captured_at) : 'N/A'}
                   </p>
                 </div>
               </div>

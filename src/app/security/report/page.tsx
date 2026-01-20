@@ -22,7 +22,7 @@ export default function CreateReportPage() {
   const router = useRouter();
   const { user } = useUser();
   const { addOfflineReport } = useOfflineReports();
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | undefined>(undefined);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -33,10 +33,11 @@ export default function CreateReportPage() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [assignedUnit, setAssignedUnit] = useState<any>(null);
   const [unitError, setUnitError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check online status
   useEffect(() => {
@@ -79,21 +80,72 @@ export default function CreateReportPage() {
     fetchAssignedUnit();
   }, [user]);
 
-  // Initialize camera
+  // Initialize camera with simplified approach to fix DOM timing issue
   const startCamera = async () => {
-    if (!videoRef.current) return;
+    console.log('🎬 startCamera() called');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error('❌ Browser does not support mediaDevices');
+      setCameraError('Browser Anda tidak mendukung akses kamera. Silakan gunakan browser yang kompatibel.');
+      setTimeout(() => setCameraError(null), 5000);
+      return;
+    }
 
     try {
+      console.log('📹 Requesting camera access...');
+
+      // First, set camera as active to show the video element
+      setIsCameraActive(true);
+
+      // Small delay to ensure video element is in DOM
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (!videoRef.current) {
+        console.error('❌ videoRef.current is still null after delay');
+        setCameraError('Gagal menginisialisasi tampilan kamera. Silakan coba lagi.');
+        setIsCameraActive(false);
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // Use rear camera if available
+        video: {
+          facingMode: 'environment'
+        }
       });
 
+      console.log('✅ Camera stream obtained successfully:', stream);
       streamRef.current = stream;
       videoRef.current.srcObject = stream;
-      setIsCameraActive(true);
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Tidak dapat mengakses kamera. Pastikan Anda telah memberikan izin.');
+      console.log('✅ Camera is now active!');
+
+    } catch (error: any) {
+      console.error('❌ Error accessing camera:', error);
+      setIsCameraActive(false); // Reset state on error
+
+      let errorMessage = 'Tidak dapat mengakses kamera.';
+
+      switch (error.name) {
+        case 'NotAllowedError':
+          errorMessage = 'Izin akses kamera ditolak. Harap aktifkan izin kamera di pengaturan browser Anda.';
+          break;
+        case 'NotFoundError':
+          errorMessage = 'Perangkat kamera tidak ditemukan pada perangkat ini.';
+          break;
+        case 'NotReadableError':
+          errorMessage = 'Kamera sedang digunakan oleh aplikasi lain.';
+          break;
+        case 'OverconstrainedError':
+          errorMessage = 'Kamera tidak mendukung konfigurasi yang diminta.';
+          break;
+        case 'SecurityError':
+          errorMessage = 'Akses kamera diblokir karena alasan keamanan. Pastikan Anda menggunakan HTTPS.';
+          break;
+        default:
+          errorMessage += ` Detail: ${error.message || 'Kesalahan tidak diketahui'}`;
+      }
+
+      setCameraError(errorMessage);
+      setTimeout(() => setCameraError(null), 5000);
     }
   };
 
@@ -119,10 +171,17 @@ export default function CreateReportPage() {
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = canvas.toDataURL('image/jpeg');
-      setImagePreview(imageData);
-      setIsImageCaptured(true);
-      setImageFile(null); // We'll set this when user confirms the photo
-      stopCamera();
+      
+      // Convert data URL to File object
+      fetch(imageData)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+          setImageFile(file);
+          setImagePreview(imageData);
+          setIsImageCaptured(true);
+          stopCamera();
+        });
     }
   };
 
@@ -137,14 +196,9 @@ export default function CreateReportPage() {
     }
   };
 
-  // Trigger camera input click
-  const triggerCameraInput = () => {
-    cameraInputRef.current?.click();
-  };
-
   // Clear the current photo and return to selection mode
   const clearPhoto = () => {
-    setImagePreview(null);
+    setImagePreview(undefined);
     setImageFile(null);
     setIsImageCaptured(false);
     stopCamera();
@@ -211,9 +265,6 @@ export default function CreateReportPage() {
     try {
       if (isOnline) {
         // Online submission - upload to Supabase Storage and save to DB
-        // Note: File uploads from client require proper RLS policies or using a service role key in an API route
-        // For security, we'll send the file to our API route which handles the upload with service role
-        
         // Prepare form data for upload
         const formData = new FormData();
         formData.append('image', imageFile);
@@ -305,26 +356,21 @@ export default function CreateReportPage() {
               )}
             </Badge>
           </CardTitle>
+          {cameraError && (
+            <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
+              {cameraError}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Hidden input for camera access */}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            ref={cameraInputRef}
-            className="hidden"
-            onChange={handleFileChange}
-          />
-
           {/* Camera/Gallery Selection */}
           <div className="space-y-2">
             <Label>Foto Bukti</Label>
-            {!isImageCaptured ? (
+            {!isImageCaptured && !isCameraActive ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button
                   type="button"
-                  onClick={triggerCameraInput}
+                  onClick={startCamera}
                   variant="outline"
                   className="flex flex-col items-center justify-center h-32"
                 >
@@ -333,15 +379,23 @@ export default function CreateReportPage() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={() => fileInputRef.current?.click()}
                   variant="outline"
                   className="flex flex-col items-center justify-center h-32"
                 >
                   <ImageUp className="h-8 w-8 mb-2" />
                   <span>Galeri</span>
                 </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </div>
-            ) : (
+            ) : isImageCaptured ? (
               <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
                 {imagePreview && (
                   <img
@@ -350,7 +404,7 @@ export default function CreateReportPage() {
                     className="w-full h-full object-cover"
                   />
                 )}
-                
+
                 {/* Overlay controls */}
                 <div className="absolute inset-0 flex items-center justify-center gap-2">
                   <Button
@@ -364,42 +418,44 @@ export default function CreateReportPage() {
                   </Button>
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {/* Camera View when active */}
-            {isCameraActive && (
-              <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                <canvas ref={canvasRef} className="hidden" />
-                
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Button
-                    type="button"
-                    onClick={capturePhoto}
-                    className="bg-red-500 hover:bg-red-600 rounded-full w-16 h-16 flex items-center justify-center"
-                  >
-                    <div className="w-12 h-12 bg-white rounded-full"></div>
-                  </Button>
-                </div>
-                
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                  <Button
-                    type="button"
-                    onClick={stopCamera}
-                    variant="secondary"
-                    className="bg-background/80 backdrop-blur"
-                  >
-                    Batalkan
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Camera View - Always render video element but control visibility */}
+            <div className={`relative aspect-video bg-muted rounded-lg overflow-hidden mt-4 ${isCameraActive ? 'block' : 'hidden'}`}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+
+              {isCameraActive && (
+                <>
+                  <div className="absolute inset-0 flex items-center justify-center z-20">
+                    <Button
+                      type="button"
+                      onClick={capturePhoto}
+                      className="bg-red-500 hover:bg-red-600 rounded-full w-16 h-16 flex items-center justify-center"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-full"></div>
+                    </Button>
+                  </div>
+
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
+                    <Button
+                      type="button"
+                      onClick={stopCamera}
+                      variant="secondary"
+                      className="bg-background/80 backdrop-blur"
+                    >
+                      Batalkan
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Location Section */}
