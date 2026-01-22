@@ -131,7 +131,14 @@ export default function ManageUnitsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          // If response is not JSON, use status text
+          errorData = { error: response.statusText || `HTTP error! status: ${response.status}` };
+        }
+
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
@@ -140,7 +147,15 @@ export default function ManageUnitsPage() {
       setFilteredUnits(filteredUnits.filter(u => u.id !== unit.id));
     } catch (err) {
       console.error('Error deleting unit:', err);
-      alert(err instanceof Error ? err.message : 'Failed to delete unit');
+      if (err instanceof TypeError && err.message.includes('fetch failed')) {
+        alert('Network error: Could not connect to the server. Please check your connection and try again.');
+      } else if (err instanceof Error && err.message.includes('Cannot delete unit: there are reports associated with this unit')) {
+        alert('Cannot delete this unit because there are reports associated with it. Please reassign or delete these reports first before deleting the unit.');
+      } else if (err instanceof Error && err.message.includes('Cannot delete unit: there are users assigned to this unit')) {
+        alert('Cannot delete this unit because there are users assigned to it. Please reassign these users to another unit first.');
+      } else {
+        alert(err instanceof Error ? err.message : 'Failed to delete unit');
+      }
     }
   };
 

@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { Activity, FileText, Building, User, LogOut } from 'lucide-react';
+import { Activity, FileText, Building, User, LogOut, MapPin } from 'lucide-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
 
@@ -14,6 +14,7 @@ export default function AdminSidebar() {
     { href: '/admin/dashboard', label: 'Live Feed', icon: Activity },
     { href: '/admin/reports', label: 'Report Management', icon: FileText },
     { href: '/admin/units', label: 'Manage Units', icon: Building },
+    { href: '/admin/unit-locations', label: 'Manage Locations', icon: MapPin },
     { href: '/admin/users', label: 'Manage Users', icon: User },
   ];
 

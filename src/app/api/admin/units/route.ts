@@ -163,44 +163,40 @@ export async function DELETE(request: NextRequest) {
       return Response.json({ error: 'Unit ID is required' }, { status: 400 });
     }
 
-    // Check if there are any users assigned to this unit
-    // Using a simple select with limit to avoid potential policy recursion
-    const { data: assignedUsers, error: userCheckError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('assigned_unit_id', id)
-      .limit(1);
-
-    if (userCheckError) {
-      console.error('Error checking users assigned to unit:', userCheckError);
-      return Response.json({ error: userCheckError.message }, { status: 500 });
-    }
-
-    if (assignedUsers && assignedUsers.length > 0) {
-      return Response.json({
-        error: 'Cannot delete unit: there are users assigned to this unit. Reassign them first.'
-      }, { status: 400 });
-    }
-
-    // Check if there are any reports associated with this unit
-    const { data: associatedReports, error: reportCheckError } = await supabaseAdmin
+    // 1. Delete all reports associated with this unit_id
+    const { error: reportsError } = await supabaseAdmin
       .from('reports')
-      .select('id')
-      .eq('unit_id', id)
-      .limit(1);
+      .delete()
+      .eq('unit_id', id);
 
-    if (reportCheckError) {
-      console.error('Error checking reports associated with unit:', reportCheckError);
-      return Response.json({ error: reportCheckError.message }, { status: 500 });
+    if (reportsError) {
+      console.error('Error deleting reports for unit:', reportsError);
+      return Response.json({ error: reportsError.message }, { status: 500 });
     }
 
-    if (associatedReports && associatedReports.length > 0) {
-      return Response.json({
-        error: 'Cannot delete unit: there are reports associated with this unit.'
-      }, { status: 400 });
+    // 2. Delete all unit_locations associated with this unit_id
+    const { error: locationsError } = await supabaseAdmin
+      .from('unit_locations')
+      .delete()
+      .eq('unit_id', id);
+
+    if (locationsError) {
+      console.error('Error deleting unit locations for unit:', locationsError);
+      return Response.json({ error: locationsError.message }, { status: 500 });
     }
 
-    // Delete the unit
+    // 3. Update all profiles that are assigned to this unit (set assigned_unit_id to null)
+    const { error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .update({ assigned_unit_id: null })
+      .eq('assigned_unit_id', id);
+
+    if (profilesError) {
+      console.error('Error updating profiles for unit:', profilesError);
+      return Response.json({ error: profilesError.message }, { status: 500 });
+    }
+
+    // 4. Finally, delete the unit itself
     const { error: unitError } = await supabaseAdmin
       .from('units')
       .delete()
@@ -211,7 +207,7 @@ export async function DELETE(request: NextRequest) {
       return Response.json({ error: unitError.message }, { status: 500 });
     }
 
-    return Response.json({ success: true, message: 'Unit deleted successfully' });
+    return Response.json({ success: true, message: 'Unit and all associated data deleted successfully' });
   } catch (error) {
     console.error('Unexpected error in units API (DELETE):', error);
     return Response.json({ error: 'Internal server error' }, { status: 500 });
