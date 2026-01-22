@@ -9,24 +9,25 @@ import { Button } from '@/components/ui/button';
 import { OnlineStatusIndicator } from '@/components/online-status-indicator';
 
 export default async function SecurityDashboardPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect('/sign-in');
-  }
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      redirect('/sign-in');
+    }
 
-  // Get user profile to check role
-  const profile = await getUserProfile(user.id);
-  if (!profile || profile.role !== 'security') {
-    redirect('/'); // Redirect if not a security user
-  }
+    // Get user profile to check role
+    const profile = await getUserProfile();
+    if (!profile || profile.role !== 'security') {
+      redirect('/'); // Redirect if not a security user
+    }
 
-  // Get user's assigned unit
-  const assignedUnit = await getCurrentUserAssignedUnit();
+    // Get user's assigned unit
+    const assignedUnit = await getCurrentUserAssignedUnit();
 
-  // Get user's reports
-  const reports = await getUserReports(user.id);
+    // Get user's reports
+    const reports = await getUserReports(profile.id);
 
-  return (
+    return (
     <div className="container mx-auto py-10">
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -161,4 +162,19 @@ export default async function SecurityDashboardPage() {
       </div>
     </div>
   );
+} catch (error) {
+  console.error('Error in SecurityDashboardPage:', error);
+  return (
+    <div className="container mx-auto py-10">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-red-500">Error Loading Dashboard</h1>
+        <p className="text-muted-foreground">Please try again later or contact support.</p>
+        <details className="mt-4 text-sm text-red-300">
+          <summary>Error details</summary>
+          <pre>{error instanceof Error ? error.message : String(error)}</pre>
+        </details>
+      </div>
+    </div>
+  );
+}
 }

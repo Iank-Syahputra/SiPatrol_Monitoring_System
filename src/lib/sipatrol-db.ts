@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { getCurrentUser } from '@/lib/user';
+import { unstable_noStore as noStore } from 'next/cache';
 
 // Types for SiPatrol application
 export type UserRole = 'admin' | 'security';
@@ -131,6 +132,8 @@ export async function deleteUnit(id: string): Promise<void> {
 
 // Profile operations
 export async function getUserProfile(): Promise<UserProfile | null> {
+  noStore(); // <--- PREVENT FUNCTION CACHING
+
   try {
     const { userId } = await auth();
 
