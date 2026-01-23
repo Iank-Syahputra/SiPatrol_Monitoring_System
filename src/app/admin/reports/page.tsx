@@ -1,34 +1,79 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Download, Printer } from "lucide-react";
+import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Download, Printer, ChevronDown, Check } from "lucide-react";
 import ReportDetailsModal from '@/components/report-details-modal';
 import AdminSidebar from '@/components/admin-sidebar';
+
+// Custom Multi-Select Component
+const MultiSelectDropdown = ({ options, selected, onChange, placeholder }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleOption = (id: string) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter((item: string) => item !== id));
+    } else {
+      onChange([...selected, id]);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-2 px-3 text-left text-sm text-white flex justify-between items-center"
+      >
+        <span className="truncate">{selected.length ? `${selected.length} Selected` : placeholder}</span>
+        <ChevronDown className="h-4 w-4 text-zinc-400" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+          {options.map((opt: any) => (
+            <div
+              key={opt.id}
+              onClick={() => toggleOption(opt.id)}
+              className="px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 cursor-pointer flex items-center gap-2"
+            >
+              <div className={`w-4 h-4 rounded border flex items-center justify-center ${selected.includes(opt.id) ? 'bg-blue-600 border-blue-600' : 'border-zinc-500'}`}>
+                {selected.includes(opt.id) && <Check className="h-3 w-3 text-white" />}
+              </div>
+              {opt.name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function ReportManagementPage() {
   const [reports, setReports] = useState<any[]>([]);
   const [allUnits, setAllUnits] = useState<any[]>([]);
+  const [allCategories, setAllCategories] = useState<any[]>([]);
   const [filteredReports, setFilteredReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('all');
-  // 1. ADD DATE STATE
+  // 1. CHANGE STATE TO ARRAYS
+  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  // 2. ADD DATE STATE
   const [selectedDate, setSelectedDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch reports and units from API
+  // 2. UPDATE FETCH LOGIC
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // 2. UPDATE FETCH LOGIC
         // Add date param to URL
         const queryParams = new URLSearchParams({
           search: searchTerm,
-          unit: selectedUnit,
-          date: selectedDate
+          date: selectedDate,
+          units: selectedUnits.join(','),       // Array to String
+          categories: selectedCategories.join(',') // Array to String
         });
 
         const response = await fetch(`/api/admin/reports?${queryParams}`);
@@ -40,6 +85,7 @@ export default function ReportManagementPage() {
         const data = await response.json();
         setReports(data.reports);
         setAllUnits(data.units);
+        setAllCategories(data.categories); // Save categories from API
         setFilteredReports(data.reports);
       } catch (err) {
         console.error('Error fetching reports:', err);
@@ -50,7 +96,7 @@ export default function ReportManagementPage() {
     };
 
     fetchData();
-  }, [searchTerm, selectedUnit, selectedDate]); // 3. ADD DEPENDENCY
+  }, [searchTerm, selectedDate, selectedUnits, selectedCategories]); // 3. ADD DEPENDENCY
 
   const handleViewReport = (report: any) => {
     setSelectedReport(report);
@@ -118,9 +164,27 @@ export default function ReportManagementPage() {
         <div className="flex-1 p-6 overflow-y-auto">
           {/* Filters */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4"> {/* Change to grid-cols-4 */}
-              {/* Search Field */}
-              <div className="md:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Use New Component */}
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Filter Units</label>
+                <MultiSelectDropdown
+                  options={allUnits}
+                  selected={selectedUnits}
+                  onChange={setSelectedUnits}
+                  placeholder="Select Units"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Filter Categories</label>
+                <MultiSelectDropdown
+                  options={allCategories}
+                  selected={selectedCategories}
+                  onChange={setSelectedCategories}
+                  placeholder="Select Categories"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Search Name</label>
                 <div className="relative">
                   <input
@@ -133,21 +197,6 @@ export default function ReportManagementPage() {
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
                 </div>
               </div>
-
-              {/* Unit Dropdown */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Filter by Unit</label>
-                <select
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={selectedUnit}
-                  onChange={(e) => setSelectedUnit(e.target.value)}
-                >
-                  {units.map(unit => (
-                    <option key={unit.id} value={unit.id}>{unit.name}</option>
-                  ))}
-                </select>
-              </div>
-
               {/* 4. ADD DATE INPUT */}
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Filter by Date</label>
@@ -157,22 +206,6 @@ export default function ReportManagementPage() {
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                 />
-              </div>
-
-              {/* Reset/Apply Button */}
-              <div className="flex items-end">
-                <button
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 rounded-lg text-sm hover:bg-zinc-700"
-                  onClick={() => {
-                    // Optional: Reset filters logic
-                    setSearchTerm('');
-                    setSelectedUnit('all');
-                    setSelectedDate('');
-                  }}
-                >
-                  <Filter className="h-4 w-4" />
-                  Reset Filters
-                </button>
               </div>
             </div>
           </div>
@@ -187,6 +220,7 @@ export default function ReportManagementPage() {
                   <tr className="border-b border-zinc-800 text-left text-sm text-zinc-400">
                     <th className="pb-3">Officer</th>
                     <th className="pb-3">Unit</th>
+                    <th className="pb-3">Category</th> {/* New Header */}
                     <th className="pb-3">Date/Time</th>
                     <th className="pb-3">Location</th>
                     <th className="pb-3">Status</th>
@@ -202,6 +236,23 @@ export default function ReportManagementPage() {
                       <td className="py-3 text-zinc-300">
                         {report.units?.name || 'N/A'}
                       </td>
+
+                      {/* NEW COLORED CATEGORY COLUMN */}
+                      <td className="py-3">
+                        {report.report_categories && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            // Logic: Red (Unsafe) > Yellow > Green
+                            (report.report_categories.color === 'red' || report.report_categories.name.toLowerCase().includes('unsafe') || report.report_categories.name.toLowerCase().includes('tidak aman') || report.report_categories.name.toLowerCase().includes('bahaya'))
+                              ? 'bg-red-500/20 text-red-400'
+                              : report.report_categories.color === 'yellow' || report.report_categories.name.toLowerCase().includes('maintenance') || report.report_categories.name.toLowerCase().includes('perbaikan') || report.report_categories.name.toLowerCase().includes('warning')
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-green-500/20 text-green-400'
+                          }`}>
+                            {report.report_categories.name}
+                          </span>
+                        )}
+                      </td>
+
                       <td className="py-3 text-zinc-300">
                         {new Date(report.captured_at).toLocaleString()}
                       </td>
@@ -229,7 +280,7 @@ export default function ReportManagementPage() {
 
                   {reports.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-zinc-500">
+                      <td colSpan={7} className="py-8 text-center text-zinc-500">
                         No reports found matching your criteria
                       </td>
                     </tr>

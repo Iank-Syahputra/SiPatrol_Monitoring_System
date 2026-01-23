@@ -17,36 +17,36 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Extract query parameters
     const { searchParams } = new URL(request.url);
+
+    // 1. PARSE MULTI-SELECT PARAMS
+    // Convert "id1,id2" string into ['id1', 'id2']
+    const unitIds = searchParams.get('units')?.split(',').filter(Boolean) || [];
+    const categoryIds = searchParams.get('categories')?.split(',').filter(Boolean) || [];
     const search = searchParams.get('search') || '';
-    const unitId = searchParams.get('unit') || 'all';
     const date = searchParams.get('date') || ''; // YYYY-MM-DD
 
-    // 1. Base Query with Joins
-    // We use !inner for profiles to filter reports based on the profile name
+    // 2. BUILD QUERY
     let query = supabaseAdmin
       .from('reports')
       .select(`
         *,
         profiles!inner(full_name),
         units(name, id),
-        report_categories(name, color),
-        unit_locations(name)
+        report_categories(id, name, color)
       `)
       .order('captured_at', { ascending: false });
 
-    // 2. Apply Unit Filter
-    if (unitId !== 'all') {
-      query = query.eq('unit_id', unitId);
-    }
+    // 3. APPLY FILTERS (.in() for arrays)
+    if (unitIds.length > 0) query = query.in('unit_id', unitIds);
+    if (categoryIds.length > 0) query = query.in('report_category_id', categoryIds); // Ensure column name matches DB
 
-    // 3. Apply Name Search Filter
+    // Apply Name Search Filter
     if (search) {
       query = query.ilike('profiles.full_name', `%${search}%`);
     }
 
-    // 4. Apply Date Filter
+    // Apply Date Filter
     if (date) {
       // Create start and end of the selected day
       const startDate = `${date}T00:00:00.000Z`;
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: reportsError.message }, { status: 500 });
     }
 
-    // Fetch units for the dropdown
+    // 4. FETCH DROPDOWN OPTIONS
     const { data: units, error: unitsError } = await supabaseAdmin
       .from('units')
       .select('id, name')
@@ -74,7 +74,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: unitsError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ reports, units });
+    const { data: categories, error: categoriesError } = await supabaseAdmin
+      .from('report_categories')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (categoriesError) {
+      console.error('Error fetching categories:', categoriesError);
+      return NextResponse.json({ error: categoriesError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ reports, units, categories });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
