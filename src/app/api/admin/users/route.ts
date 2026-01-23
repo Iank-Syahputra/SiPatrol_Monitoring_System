@@ -1,6 +1,101 @@
 import { createClient } from '@supabase/supabase-js';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    // Verify the user is authenticated
+    const { userId: currentUserId } = await auth();
+
+    if (!currentUserId) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get Clerk client instance
+    const client = await clerkClient();
+
+    // Get Supabase client with service role key to bypass RLS
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const body = await request.json();
+    const { fullName, username, password, phoneNumber, unitId } = body;
+
+    // 1. VALIDATION
+    if (!fullName || !username || !password || !unitId) {
+      return Response.json({ error: 'Full name, username, password, and unit ID are required' }, { status: 400 });
+    }
+
+    if (!password || password.length < 8) {
+      return Response.json({ error: 'Password minimal 8 karakter!' }, { status: 400 });
+    }
+
+    // Check if the current user is an admin
+    const { data: currentUserProfile, error: authError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', currentUserId)
+      .single();
+
+    if (authError || !currentUserProfile || currentUserProfile.role !== 'admin') {
+      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // 2. PREPARE DATA
+    // Convert empty string to null explicitly
+    const validPhone = (!phoneNumber || phoneNumber.trim() === "") ? null : phoneNumber;
+
+    // 3. CLERK CREATION
+    // We do NOT send phone number to Clerk to avoid formatting issues
+    let clerkUser;
+    try {
+      clerkUser = await client.users.createUser({
+        username: username,
+        password: password,
+        firstName: fullName,
+        skipPasswordChecks: true,
+      });
+    } catch (clerkErr) {
+      // Catch Clerk validation errors (e.g. Username taken)
+      console.error("Clerk Create Error:", clerkErr);
+      const msg = clerkErr.errors?.[0]?.longMessage || clerkErr.message || "Gagal membuat user di Clerk";
+      return Response.json({ error: `Clerk: ${msg}` }, { status: 422 });
+    }
+
+    // 4. SUPABASE INSERT
+    const { error: insertError } = await supabaseAdmin
+      .from('profiles')
+      .insert([{
+        id: clerkUser.id,
+        full_name: fullName,
+        username: username,
+        role: 'security',
+        assigned_unit_id: unitId,
+        phone_number: validPhone, // This will be null if empty
+      }]);
+
+    if (insertError) {
+      console.error("Supabase Insert Error:", insertError);
+      // Rollback Clerk User
+      try {
+        await client.users.deleteUser(clerkUser.id);
+      } catch (rollbackError) {
+        console.error('Error deleting Clerk user during rollback:', rollbackError);
+      }
+      return Response.json({ error: `Database Error: ${insertError.message}` }, { status: 500 });
+    }
+
+    return Response.json({ success: true, userId: clerkUser.id });
+  } catch (error) {
+    console.error("General API Error:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Terjadi kesalahan internal server" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function PUT(request: NextRequest) {
   try {

@@ -91,6 +91,13 @@ export default function CreateUserPage() {
     setError(null);
     setSuccess(null);
 
+    // Add manual validation for required fields
+    if (!selectedUnit) {
+      setError('Please select an Assigned Unit.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/users', {
         method: 'POST',
@@ -101,7 +108,7 @@ export default function CreateUserPage() {
           fullName,
           username,
           password,
-          phoneNumber: phoneNumber,
+          phoneNumber: phoneNumber || null, // Send null if empty
           unitId: selectedUnit,
         }),
       });
@@ -227,7 +234,7 @@ export default function CreateUserPage() {
 
             <div className="space-y-2">
               <Label htmlFor="phoneNumber">
-                Phone Number
+                Phone Number (optional)
               </Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -235,16 +242,15 @@ export default function CreateUserPage() {
                   id="phoneNumber"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter phone number"
+                  placeholder="Enter phone number (optional)"
                   className="pl-10"
-                  required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="unit">
-                Assigned Unit
+                Assigned Unit <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
                 <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
