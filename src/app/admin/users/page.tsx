@@ -223,7 +223,7 @@ export default function ManageUsersPage() {
                     {users.map((user: any) => (
                       <tr key={user.id} className="text-sm hover:bg-zinc-800/50 transition-colors">
                         <td className="py-3 pl-2 font-medium text-white">{user.full_name}</td>
-                        <td className="py-3 text-zinc-300">@{user.username}</td>
+                        <td className="py-3 text-zinc-300">{user.username}</td>
                         <td className="py-3 text-zinc-300">{user.units?.name || '-'}</td>
                         <td className="py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${

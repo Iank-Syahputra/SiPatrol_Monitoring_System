@@ -136,14 +136,6 @@ export default function AdminDashboard() {
                   <Clock className="h-4 w-4" />
                   Live
                 </div>
-                <button className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-lg text-sm hover:bg-zinc-700">
-                  <Search className="h-4 w-4" />
-                  Search
-                </button>
-                <button className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-lg text-sm hover:bg-zinc-700">
-                  <Filter className="h-4 w-4" />
-                  Filter
-                </button>
               </div>
             </div>
 
@@ -157,7 +149,17 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      <div className="bg-zinc-700 border-2 border-dashed rounded-xl w-16 h-16" />
+                      {report.image_path ? (
+                        <img
+                          src={report.image_path}
+                          alt="Report"
+                          className="w-16 h-16 rounded-xl object-cover border border-zinc-700 bg-zinc-800"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+                          <FileText className="h-6 w-6 text-zinc-600" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">

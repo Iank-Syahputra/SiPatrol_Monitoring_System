@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Plus, Download, Printer, Edit3, Trash2 } from "lucide-react";
+import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Plus, Download, Printer, Edit, Trash } from "lucide-react";
 import AdminSidebar from '@/components/admin-sidebar';
 
 export default function ManageUnitsPage() {
@@ -386,13 +386,13 @@ export default function ManageUnitsPage() {
                             className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
                             onClick={() => startEditUnit(unit)}
                           >
-                            <Edit3 className="h-4 w-4" /> Edit
+                            <Edit className="h-4 w-4" /> Edit
                           </button>
                           <button
                             className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1"
                             onClick={() => handleDeleteUnit(unit)}
                           >
-                            <Trash2 className="h-4 w-4" /> Delete
+                            <Trash className="h-4 w-4" /> Delete
                           </button>
                         </div>
                       </td>
