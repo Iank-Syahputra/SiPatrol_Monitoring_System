@@ -63,6 +63,9 @@ export default function ReportManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 1. ADD TRIGGER STATE
+  const [filterTrigger, setFilterTrigger] = useState(0);
+
   // 2. UPDATE FETCH LOGIC
   useEffect(() => {
     const fetchData = async () => {
@@ -96,7 +99,22 @@ export default function ReportManagementPage() {
     };
 
     fetchData();
-  }, [searchTerm, selectedDate, selectedUnits, selectedCategories]); // 3. ADD DEPENDENCY
+    // ONLY RUN ON MOUNT OR WHEN TRIGGER CHANGES
+  }, [filterTrigger]); // 3. UPDATE DEPENDENCY
+
+  // 3. HANDLER FUNCTIONS
+  const handleApplyFilters = () => {
+    setFilterTrigger(prev => prev + 1);
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedUnits([]);
+    setSelectedCategories([]);
+    setSelectedDate('');
+    // Trigger fetch after state update (React batches these, so effect sees new state)
+    setFilterTrigger(prev => prev + 1);
+  };
 
   const handleViewReport = (report: any) => {
     setSelectedReport(report);
@@ -164,7 +182,7 @@ export default function ReportManagementPage() {
         <div className="flex-1 p-6 overflow-y-auto">
           {/* Filters */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4"> {/* Change cols to 5 to fit buttons */}
               {/* Use New Component */}
               <div>
                 <label className="block text-sm text-zinc-400 mb-2">Filter Units</label>
@@ -207,6 +225,23 @@ export default function ReportManagementPage() {
                   onChange={(e) => setSelectedDate(e.target.value)}
                 />
               </div>
+              {/* 4. BUTTONS SECTION */}
+              <div className="flex items-end gap-2">
+                <button
+                  onClick={handleApplyFilters}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+                >
+                  <Filter className="h-4 w-4" />
+                  Apply
+                </button>
+                <button
+                  onClick={handleResetFilters}
+                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg text-sm transition-colors"
+                  title="Reset Filters"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 
@@ -220,7 +255,7 @@ export default function ReportManagementPage() {
                   <tr className="border-b border-zinc-800 text-left text-sm text-zinc-400">
                     <th className="pb-3">Officer</th>
                     <th className="pb-3">Unit</th>
-                    <th className="pb-3">Category</th> {/* New Header */}
+                    <th className="pb-3">Category</th>
                     <th className="pb-3">Date/Time</th>
                     <th className="pb-3">Location</th>
                     <th className="pb-3">Status</th>

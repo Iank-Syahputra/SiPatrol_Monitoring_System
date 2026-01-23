@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const date = searchParams.get('date') || ''; // YYYY-MM-DD
 
-    // 2. BUILD QUERY
+    // 1. QUERY BUILDER
     let query = supabaseAdmin
       .from('reports')
       .select(`
@@ -37,23 +37,28 @@ export async function GET(request: NextRequest) {
       `)
       .order('captured_at', { ascending: false });
 
-    // 3. APPLY FILTERS (.in() for arrays)
-    if (unitIds.length > 0) query = query.in('unit_id', unitIds);
-    if (categoryIds.length > 0) query = query.in('report_category_id', categoryIds); // Ensure column name matches DB
+    // 2. APPLY FILTERS
 
-    // Apply Name Search Filter
+    // Search by Name
     if (search) {
       query = query.ilike('profiles.full_name', `%${search}%`);
     }
 
-    // Apply Date Filter
+    // Filter by Date
     if (date) {
-      // Create start and end of the selected day
       const startDate = `${date}T00:00:00.000Z`;
       const endDate = `${date}T23:59:59.999Z`;
-
-      // Filter captured_at between start and end of that day
       query = query.gte('captured_at', startDate).lte('captured_at', endDate);
+    }
+
+    // Filter by Unit
+    if (unitIds.length > 0) {
+      query = query.in('unit_id', unitIds);
+    }
+
+    // Filter by Category (CORRECTED based on DB Screenshot)
+    if (categoryIds.length > 0) {
+      query = query.in('category_id', categoryIds); // <--- Using 'category_id'
     }
 
     const { data: reports, error: reportsError } = await query;
