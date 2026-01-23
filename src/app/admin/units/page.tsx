@@ -5,8 +5,8 @@ import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, S
 import AdminSidebar from '@/components/admin-sidebar';
 
 export default function ManageUnitsPage() {
-  const [units, setUnits] = useState<any[]>([]);
-  const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
+  const [allUnits, setAllUnits] = useState<any[]>([]); // Stores all data
+  const [filteredUnits, setFilteredUnits] = useState<any[]>([]); // Stores displayed data
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -14,20 +14,19 @@ export default function ManageUnitsPage() {
   const [editingUnit, setEditingUnit] = useState<any>(null);
   const [showEditForm, setShowEditForm] = useState(false);
 
-  // Fetch units from API
+  // 2. FETCH ALL DATA (Run Once)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAllUnits = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/admin/units?search=${encodeURIComponent(searchTerm)}`);
+        // Call API without search params to get everything
+        const response = await fetch(`/api/admin/units`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
-        setUnits(data.units);
-        setFilteredUnits(data.units);
+        setAllUnits(data.units || []);       // Save to Master
+        setFilteredUnits(data.units || []);  // Initialize View
       } catch (err) {
         console.error('Error fetching units:', err);
         setError('Failed to load units');
@@ -36,8 +35,23 @@ export default function ManageUnitsPage() {
       }
     };
 
-    fetchData();
-  }, [searchTerm]);
+    fetchAllUnits();
+  }, []); // Empty dependency = Run Once
+
+  // 3. REAL-TIME FILTER EFFECT (Runs on typing)
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredUnits(allUnits);
+    } else {
+      const lowerTerm = searchTerm.toLowerCase();
+      // Filter in memory (Instant)
+      const results = allUnits.filter(unit =>
+        unit.name.toLowerCase().includes(lowerTerm) ||
+        (unit.district && unit.district.toLowerCase().includes(lowerTerm))
+      );
+      setFilteredUnits(results);
+    }
+  }, [searchTerm, allUnits]);
 
   const handleAddUnit = async () => {
     // Get form values
@@ -64,8 +78,11 @@ export default function ManageUnitsPage() {
 
       // Refresh the data
       const data = await response.json();
-      setUnits([data.unit, ...units]);
-      setFilteredUnits([data.unit, ...filteredUnits]);
+
+      // Update Master List Manually
+      const updatedList = [data.unit, ...allUnits];
+      setAllUnits(updatedList);
+      // The Filter Effect above will automatically update 'filteredUnits'
       setShowAddForm(false);
 
       // Clear form
@@ -102,8 +119,10 @@ export default function ManageUnitsPage() {
 
       // Refresh the data
       const data = await response.json();
-      setUnits(units.map(u => u.id === editingUnit.id ? data.unit : u));
-      setFilteredUnits(filteredUnits.map(u => u.id === editingUnit.id ? data.unit : u));
+
+      // Update Item in Master List
+      const updatedList = allUnits.map(u => u.id === editingUnit.id ? data.unit : u);
+      setAllUnits(updatedList);
       setShowEditForm(false);
       setEditingUnit(null);
 
@@ -142,9 +161,9 @@ export default function ManageUnitsPage() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      // Remove from state
-      setUnits(units.filter(u => u.id !== unit.id));
-      setFilteredUnits(filteredUnits.filter(u => u.id !== unit.id));
+      // Remove from Master List
+      const updatedList = allUnits.filter(u => u.id !== unit.id);
+      setAllUnits(updatedList);
     } catch (err) {
       console.error('Error deleting unit:', err);
       if (err instanceof TypeError && err.message.includes('fetch failed')) {
@@ -350,7 +369,7 @@ export default function ManageUnitsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800">
-                  {units.map((unit: any) => (
+                  {filteredUnits.map((unit: any) => (
                     <tr key={unit.id} className="text-sm">
                       <td className="py-3 font-medium text-white">
                         {unit.name}
@@ -380,7 +399,7 @@ export default function ManageUnitsPage() {
                     </tr>
                   ))}
 
-                  {units.length === 0 && (
+                  {filteredUnits.length === 0 && (
                     <tr>
                       <td colSpan={4} className="py-8 text-center text-zinc-500">
                         No units found matching your criteria
