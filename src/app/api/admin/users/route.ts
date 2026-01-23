@@ -1,6 +1,58 @@
 import { createClient } from '@supabase/supabase-js';
 import { auth, clerkClient } from '@clerk/nextjs/server';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { userId: currentUserId } = await auth();
+
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get Supabase client with service role key to bypass RLS
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || '';
+
+    // Parse Multi-Select Param
+    const unitIds = searchParams.get('units')?.split(',').filter(Boolean) || [];
+
+    // 1. Base Query
+    let query = supabaseAdmin
+      .from('profiles')
+      .select(`
+        *,
+        units (id, name)
+      `)
+      .order('created_at', { ascending: false });
+
+    // 2. Apply Search (Name or Username)
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,username.ilike.%${search}%`);
+    }
+
+    // 3. Apply Multi-Select Unit Filter
+    if (unitIds.length > 0) {
+      query = query.in('assigned_unit_id', unitIds);
+    }
+
+    const { data: users, error } = await query;
+    if (error) throw error;
+
+    // 4. Fetch Units for Dropdown
+    const { data: units } = await supabaseAdmin.from('units').select('id, name').order('name');
+
+    return NextResponse.json({ users, units });
+
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
