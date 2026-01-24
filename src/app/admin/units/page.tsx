@@ -289,6 +289,7 @@ export default function ManageUnitsPage() {
                       type="text"
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter district"
+                      defaultValue="PT PLN Nusantara Power UP Kendari"
                     />
                   </div>
                 </div>
