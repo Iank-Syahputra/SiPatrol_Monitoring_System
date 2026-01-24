@@ -44,17 +44,21 @@ export default function CreateReportPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Check online status
+  // 1. UPDATE STATE & EFFECT (Inside Component)
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    // Check status immediately on mount
+    setIsOnline(navigator.onLine);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    const handleStatusChange = () => {
+      setIsOnline(navigator.onLine);
+    };
+
+    window.addEventListener('online', handleStatusChange);
+    window.addEventListener('offline', handleStatusChange);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleStatusChange);
+      window.removeEventListener('offline', handleStatusChange);
     };
   }, []);
 
@@ -252,7 +256,7 @@ export default function CreateReportPage() {
     );
   };
 
-  // Submit report
+  // 2. UPDATE SUBMIT FUNCTION (Try-Catch Pattern)
   const submitReport = async () => {
     if (!user) {
       alert('Anda harus masuk untuk mengirim laporan');
@@ -292,39 +296,45 @@ export default function CreateReportPage() {
     setIsSubmitting(true);
 
     try {
-      if (isOnline) {
-        // Online submission - upload to Supabase Storage and save to DB
-        // Prepare form data for upload
-        const formData = new FormData();
-        formData.append('image', imageFile);
-        formData.append('notes', notes);
-        formData.append('latitude', location.lat.toString());
-        formData.append('longitude', location.lng.toString());
-        formData.append('unitId', assignedUnit.id);
-        formData.append('userId', user.id);
-        formData.append('categoryId', category);
-        formData.append('locationId', locationRoom);
+      // FORCE CHECK: If browser says offline, throw error immediately to skip fetch
+      if (!navigator.onLine) {
+        throw new Error('OFFLINE_MODE');
+      }
 
-        const response = await fetch('/api/reports', {
-          method: 'POST',
-          body: formData,
-        });
+      // Prepare Data
+      const formData = new FormData();
+      formData.append('image', imageFile);
+      formData.append('notes', notes);
+      formData.append('latitude', location.lat.toString());
+      formData.append('longitude', location.lng.toString());
+      formData.append('unitId', assignedUnit.id);
+      formData.append('userId', user.id);
+      formData.append('categoryId', category);
+      formData.append('locationId', locationRoom);
 
-        if (response.ok) {
-          const result = await response.json();
-          alert('Laporan berhasil dikirim!');
-          router.push('/security');
-        } else {
-          const error = await response.json();
-          console.error('Error submitting report:', error);
-          alert(`Gagal mengirim laporan: ${error.error || 'Kesalahan tidak diketahui'}`);
-        }
-      } else {
-        // Offline submission - save to IndexedDB
+      // Attempt Upload
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('SERVER_ERROR');
+      }
+
+      // Success Online
+      alert('Laporan berhasil dikirim (Online)!');
+      router.push('/security');
+
+    } catch (error: any) {
+      console.warn('Upload failed or Offline, switching to local storage...', error.message);
+
+      // FALLBACK: Save to IndexedDB
+      try {
         await addOfflineReport({
           userId: user.id,
           unitId: assignedUnit.id,
-          imageData: imagePreview, // Store the preview URL for offline
+          imageData: imagePreview,
           notes,
           latitude: location.lat,
           longitude: location.lng,
@@ -333,12 +343,12 @@ export default function CreateReportPage() {
           capturedAt: new Date().toISOString()
         });
 
-        alert('Laporan disimpan secara offline. Akan dikirim saat Anda terhubung kembali ke internet.');
+        alert('Mode Offline: Laporan DISIMPAN di perangkat. Akan dikirim otomatis saat online.');
         router.push('/security');
+      } catch (offlineError) {
+        console.error('Critical Error:', offlineError);
+        alert('Gagal mengirim dan gagal menyimpan laporan. Mohon coba lagi.');
       }
-    } catch (error) {
-      console.error('Error submitting report:', error);
-      alert('Gagal mengirim laporan. Silakan coba lagi.');
     } finally {
       setIsSubmitting(false);
     }

@@ -213,7 +213,7 @@ export default function ManageUsersPage() {
                     <tr className="border-b border-zinc-800 text-left text-sm text-zinc-400">
                       <th className="pb-3 pl-2">Full Name</th>
                       <th className="pb-3">Username</th>
-                      <th className="pb-3">Phone</th> {/* 1. Tambahkan Header Ini */}
+                      <th className="pb-3">Phone</th>
                       <th className="pb-3">Unit</th>
                       <th className="pb-3">Role</th>
                       <th className="pb-3">Created At</th>
@@ -225,12 +225,7 @@ export default function ManageUsersPage() {
                       <tr key={user.id} className="text-sm hover:bg-zinc-800/50 transition-colors">
                         <td className="py-3 pl-2 font-medium text-white">{user.full_name}</td>
                         <td className="py-3 text-zinc-300">{user.username}</td>
-
-                        {/* 2. Tambahkan Data Phone Ini */}
-                        <td className="py-3 text-zinc-300">
-                          {user.phone_number || '-'}
-                        </td>
-
+                        <td className="py-3 text-zinc-300">{user.phone_number || '-'}</td>
                         <td className="py-3 text-zinc-300">{user.units?.name || '-'}</td>
                         <td className="py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${

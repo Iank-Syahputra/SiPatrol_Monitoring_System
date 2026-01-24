@@ -1,110 +1,115 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOfflineReports } from '@/hooks/use-offline-reports';
+import { getAllOfflineReports } from '@/hooks/use-offline-reports'; // Import directly
 import { useUser } from '@clerk/nextjs';
 
-interface SyncResult {
-  success: boolean;
-  message: string;
-  syncedCount: number;
-}
-
-// Function to sync offline reports with the server
-export const syncOfflineReports = async (
-  getAllOfflineReports: () => Promise<any[]>,
-  deleteOfflineReport: (id: string) => Promise<void>
-): Promise<SyncResult> => {
-  try {
-    // Get all offline reports from IndexedDB
-    const offlineReports = await getAllOfflineReports();
-
-    if (offlineReports.length === 0) {
-      return { success: true, message: 'No offline reports to sync', syncedCount: 0 };
-    }
-
-    let syncedCount = 0;
-
-    // Attempt to sync each report
-    for (const report of offlineReports) {
-      try {
-        const syncResponse = await fetch('/api/reports/sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageData: report.imageData,
-            notes: report.notes,
-            latitude: report.latitude,
-            longitude: report.longitude,
-            unitId: report.unitId,
-            userId: report.userId,
-            categoryId: report.categoryId || '',
-            locationId: report.locationId || '',
-            capturedAt: report.capturedAt
-          }),
-        });
-
-        if (syncResponse.ok) {
-          // Delete the synced report from IndexedDB
-          await deleteOfflineReport(report.id);
-          syncedCount++;
-        } else {
-          console.error(`Failed to sync report ${report.id}:`, await syncResponse.text());
-        }
-      } catch (error) {
-        console.error(`Error syncing report ${report.id}:`, error);
-        // Continue with other reports even if one fails
-      }
-    }
-
-    return {
-      success: true,
-      message: `Synced ${syncedCount} out of ${offlineReports.length} reports`,
-      syncedCount
-    };
-  } catch (error) {
-    console.error('Error during sync:', error);
-    return { success: false, message: 'Sync failed', syncedCount: 0 };
-  }
-};
-
-// Hook to handle automatic sync when online
-export const useAutoSync = () => {
-  const { offlineReports, refreshOfflineReports, addOfflineReport, deleteOfflineReport, clearAllOfflineReports, getAllOfflineReports } = useOfflineReports();
+export function useAutoSync() {
+  const { refreshOfflineReports, deleteOfflineReport } = useOfflineReports();
   const { isSignedIn } = useUser();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+
+  // Fungsi Sinkronisasi Inti
+  const syncOfflineReports = async () => {
+    if (!navigator.onLine) {
+      console.log('Browser offline, skip sync.');
+      return;
+    }
+
+    if (isSyncing) return;
+
+    try {
+      setIsSyncing(true);
+
+      // 3. Panggil fungsi yang di-import langsung
+      const offlineReports = await getAllOfflineReports();
+
+      if (offlineReports.length === 0) {
+        setIsSyncing(false);
+        return;
+      }
+
+      console.log(`📡 Menemukan ${offlineReports.length} laporan pending. Memulai upload...`);
+
+      let syncedCount = 0;
+
+      for (const report of offlineReports) {
+        try {
+          // Convert Base64 Image balik ke File
+          const res = await fetch(report.imageData);
+          const blob = await res.blob();
+          const imageFile = new File([blob], "offline_evidence.jpg", { type: "image/jpeg" });
+
+          const formData = new FormData();
+          formData.append('image', imageFile);
+          formData.append('notes', report.notes || '');
+          formData.append('latitude', String(report.latitude || ''));
+          formData.append('longitude', String(report.longitude || ''));
+          formData.append('unitId', report.unitId);
+          formData.append('userId', report.userId);
+          formData.append('categoryId', report.categoryId || '');
+          formData.append('locationId', report.locationId || '');
+          // Pastikan field ini sesuai dengan yang diminta backend (capturedAt vs captured_at)
+          formData.append('capturedAt', report.capturedAt);
+          formData.append('is_offline_submission', 'true');
+
+          // Kirim ke API
+          const response = await fetch('/api/reports', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (response.ok) {
+            // PERBAIKAN DI SINI:
+            // Hapus dari IndexedDB. Pastikan ID dikirim sebagai STRING, sesuai dengan tipe di IndexedDB.
+            if (report.id) {
+              // report.id sudah berupa string karena IndexedDB menggunakan UUID
+              await deleteOfflineReport(report.id.toString());
+            }
+
+            syncedCount++;
+            console.log(`✅ Laporan ID ${report.id} terkirim dan dihapus dari lokal.`);
+          } else {
+            console.error(`❌ Gagal kirim laporan ID ${report.id}`);
+          }
+        } catch (err) {
+          console.error(`❌ Error processing ID ${report.id}:`, err);
+        }
+      }
+
+      // Update UI setelah sync selesai
+      await refreshOfflineReports();
+
+      if (syncedCount > 0) {
+        console.log(`${syncedCount} Laporan offline berhasil disinkronisasi ke server!`);
+      }
+
+    } catch (error) {
+      console.error('Sync process failed:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isSignedIn) return;
 
-    const handleOnline = async () => {
-      if (offlineReports.length > 0 && !isSyncing) {
-        setIsSyncing(true);
-        try {
-          await syncOfflineReports(getAllOfflineReports, deleteOfflineReport);
-          refreshOfflineReports(); // Refresh the list after sync
-          setLastSync(new Date());
-        } finally {
-          setIsSyncing(false);
-        }
-      }
+    const handleOnline = () => {
+      console.log('🌐 Internet terhubung kembali! Memicu auto-sync...');
+      syncOfflineReports();
     };
 
-    // Listen for online event
     window.addEventListener('online', handleOnline);
 
-    // Also try to sync when component mounts if online and has offline reports
-    if (navigator.onLine && offlineReports.length > 0 && !isSyncing) {
-      handleOnline();
+    if (navigator.onLine) {
+      syncOfflineReports();
     }
 
     return () => {
       window.removeEventListener('online', handleOnline);
     };
-  }, [offlineReports.length, isSignedIn, isSyncing, refreshOfflineReports, getAllOfflineReports, deleteOfflineReport]);
+  }, [isSignedIn]);
 
-  return { isSyncing, lastSync, getAllOfflineReports };
-};
+  return { isSyncing, syncOfflineReports };
+}

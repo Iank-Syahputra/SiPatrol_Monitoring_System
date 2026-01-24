@@ -45,7 +45,7 @@ const openDB = (): Promise<IDBDatabase> => {
 
     request.onupgradeneeded = (event) => {
       const database = (event.target as IDBOpenDBRequest).result;
-      
+
       if (!database.objectStoreNames.contains(OFFLINE_REPORTS_STORE)) {
         const store = database.createObjectStore(OFFLINE_REPORTS_STORE, { keyPath: 'id' });
         store.createIndex('createdAt', 'createdAt', { unique: false });
@@ -59,21 +59,21 @@ export const addOfflineReport = async (report: Omit<OfflineReport, 'id' | 'creat
   const database = await openDB();
   const transaction = database.transaction([OFFLINE_REPORTS_STORE], 'readwrite');
   const store = transaction.objectStore(OFFLINE_REPORTS_STORE);
-  
+
   const id = crypto.randomUUID();
   const reportWithId: OfflineReport = {
     ...report,
     id,
     createdAt: new Date().toISOString()
   };
-  
+
   const request = store.add(reportWithId);
-  
+
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
       resolve(id);
     };
-    
+
     request.onerror = () => {
       reject(request.error);
     };
@@ -85,14 +85,14 @@ export const getAllOfflineReports = async (): Promise<OfflineReport[]> => {
   const database = await openDB();
   const transaction = database.transaction([OFFLINE_REPORTS_STORE], 'readonly');
   const store = transaction.objectStore(OFFLINE_REPORTS_STORE);
-  
+
   const request = store.getAll();
-  
+
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       reject(request.error);
     };
@@ -104,14 +104,14 @@ export const deleteOfflineReport = async (id: string): Promise<void> => {
   const database = await openDB();
   const transaction = database.transaction([OFFLINE_REPORTS_STORE], 'readwrite');
   const store = transaction.objectStore(OFFLINE_REPORTS_STORE);
-  
+
   const request = store.delete(id);
-  
+
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
       resolve();
     };
-    
+
     request.onerror = () => {
       reject(request.error);
     };
@@ -123,14 +123,14 @@ export const clearAllOfflineReports = async (): Promise<void> => {
   const database = await openDB();
   const transaction = database.transaction([OFFLINE_REPORTS_STORE], 'readwrite');
   const store = transaction.objectStore(OFFLINE_REPORTS_STORE);
-  
+
   const request = store.clear();
-  
+
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
       resolve();
     };
-    
+
     request.onerror = () => {
       reject(request.error);
     };
