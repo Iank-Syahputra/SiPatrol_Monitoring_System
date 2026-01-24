@@ -10,6 +10,8 @@ import {
   Sheet,
   SheetContent,
   SheetTrigger,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -94,6 +96,8 @@ export default function SecuritySidebar({
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0 bg-zinc-950 text-zinc-100 border-r border-zinc-800">
+          <SheetTitle className="sr-only">Menu Navigasi Security</SheetTitle>
+          <SheetDescription className="sr-only">Sidebar navigasi utama</SheetDescription>
           <div className="flex h-14 items-center gap-2 px-4 border-b border-zinc-800">
             <div className="p-2 bg-blue-600 rounded-lg">
               <Shield className="w-6 h-6 text-white" />
