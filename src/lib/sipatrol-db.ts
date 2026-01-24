@@ -450,7 +450,8 @@ export async function getUserReports(userId: string): Promise<Report[]> {
         *,
         units(name),
         report_categories(name, color),
-        unit_locations(name)
+        unit_locations(name),
+        profiles (full_name)  // <--- TAMBAHKAN BARIS INI (Supaya nama tidak N/A)
       `)
       .eq('user_id', userId)
       .order('captured_at', { ascending: false });
