@@ -207,18 +207,6 @@ export default function ReportManagementPage() {
                   placeholder="Select Categories"
                 />
               </div>
-
-              {/* NEW LOCATION FILTER */}
-              <div>
-                <label className="block text-sm text-zinc-400 mb-2">Filter Location</label>
-                <MultiSelectDropdown
-                  options={allLocations}
-                  selected={selectedLocations}
-                  onChange={setSelectedLocations}
-                  placeholder="Select Spots"
-                />
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Search Name</label>
                 <div className="relative">
