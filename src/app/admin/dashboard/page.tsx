@@ -11,6 +11,28 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userLoading, setUserLoading] = useState(true);
+
+  // Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch('/api/user/profile');
+
+        if (response.ok) {
+          const profileData = await response.json();
+          setUserProfile(profileData);
+        }
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -96,7 +118,14 @@ export default function AdminDashboard() {
         {/* Header */}
         <header className="border-b border-zinc-800 bg-zinc-900/50 p-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold">Central Dashboard</h1>
+            <div>
+              <h1 className="text-xl font-bold">Central Dashboard</h1>
+              {!userLoading && userProfile?.full_name && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Halo, <span className="font-semibold text-white">{userProfile.full_name}</span>
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
                 <div className="h-2 w-2 bg-emerald-500 rounded-full"></div>
