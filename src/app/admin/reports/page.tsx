@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Download, Printer, ChevronDown, Check } from "lucide-react";
+import { Activity, Map, Users, AlertTriangle, CircleGauge, Clock, Shield, Eye, Search, Filter, FileText, Building, User, Download, Printer, ChevronDown, Check, ImageIcon } from "lucide-react";
 import ReportDetailsModal from '@/components/report-details-modal';
 import AdminSidebar from '@/components/admin-sidebar';
 
@@ -283,25 +283,47 @@ export default function ReportManagementPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-zinc-800 text-left text-sm text-zinc-400">
+                    <th className="pb-3 pl-2">Evidence</th> {/* 1. Ganti Location jadi Evidence */}
                     <th className="pb-3">Officer</th>
                     <th className="pb-3">Unit</th>
                     <th className="pb-3">Category</th>
                     <th className="pb-3">Specific Loc</th>
                     <th className="pb-3">Date/Time</th>
-                    <th className="pb-3">Location</th>
+                    {/* HAPUS COLUMN Location */}
                     <th className="pb-3">Status</th>
                     <th className="pb-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800">
                   {reports.map((report: any) => (
-                    <tr key={report.id} className="text-sm">
+                    <tr key={report.id} className="text-sm hover:bg-zinc-800/30 transition-colors">
+                      {/* 2. Tampilkan Preview Foto */}
+                      <td className="py-3 pl-2">
+                        <div className="h-10 w-16 bg-zinc-800 rounded-md overflow-hidden border border-zinc-700 flex items-center justify-center">
+                          {report.image_path ? (
+                            <img
+                              src={report.image_path}
+                              alt="Evd"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <FileText className="h-4 w-4 text-zinc-600" />
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 font-medium text-white">{report.profiles?.full_name || 'N/A'}</td>
                       <td className="py-3 text-zinc-300">{report.units?.name || 'N/A'}</td>
-                      <td className="py-3">{report.report_categories && (<span className={`px-2 py-1 rounded-full text-xs font-medium ${(report.report_categories.color === 'red' || report.report_categories.name.toLowerCase().includes('unsafe') || report.report_categories.name.toLowerCase().includes('tidak aman') || report.report_categories.name.toLowerCase().includes('bahaya')) ? 'bg-red-500/20 text-red-400' : report.report_categories.color === 'yellow' || report.report_categories.name.toLowerCase().includes('maintenance') || report.report_categories.name.toLowerCase().includes('perbaikan') || report.report_categories.name.toLowerCase().includes('warning') ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>{report.report_categories.name}</span>)}</td>
+                      <td className="py-3">
+                        {report.report_categories && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${(report.report_categories.color === 'red' || report.report_categories.name.toLowerCase().includes('unsafe') || report.report_categories.name.toLowerCase().includes('tidak aman')) ? 'bg-red-500/20 text-red-400' : report.report_categories.color === 'yellow' || report.report_categories.name.toLowerCase().includes('maintenance') ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>
+                            {report.report_categories.name}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 text-zinc-300">{report.unit_locations?.name || '-'}</td>
                       <td className="py-3 text-zinc-300">{new Date(report.captured_at).toLocaleString()}</td>
-                      <td className="py-3 text-zinc-300">{report.latitude && report.longitude ? `${report.latitude.toFixed(4)}, ${report.longitude.toFixed(4)}` : 'N/A'}</td>
+                      {/* HAPUS CELL Kordinat */}
                       <td className="py-3"><span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full">Completed</span></td>
                       <td className="py-3"><button onClick={() => handleViewReport(report)} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm"><Eye className="h-4 w-4" />View</button></td>
                     </tr>
