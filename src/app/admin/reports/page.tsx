@@ -60,8 +60,9 @@ export default function ReportManagementPage() {
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]); // New State for Filter
-  // 2. ADD DATE STATE
-  const [selectedDate, setSelectedDate] = useState('');
+  // PERUBAHAN 1: Menggunakan Start Date dan End Date
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,13 +74,14 @@ export default function ReportManagementPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Add date param to URL
+        // PERUBAHAN 2: Kirim range tanggal ke API
         const queryParams = new URLSearchParams({
           search: searchTerm,
-          date: selectedDate,
-          units: selectedUnits.join(','),       // Array to String
-          categories: selectedCategories.join(','), // Array to String
-          locations: selectedLocations.join(',') // Add this
+          startDate: startDate, // Kirim start date
+          endDate: endDate,     // Kirim end date
+          units: selectedUnits.join(','),
+          categories: selectedCategories.join(','),
+          locations: selectedLocations.join(',')
         });
 
         const response = await fetch(`/api/admin/reports?${queryParams}`);
@@ -115,8 +117,10 @@ export default function ReportManagementPage() {
     setSearchTerm('');
     setSelectedUnits([]);
     setSelectedCategories([]);
-    setSelectedLocations([]); // Reset this
-    setSelectedDate('');
+    setSelectedLocations([]);
+    // Reset kedua tanggal
+    setStartDate('');
+    setEndDate('');
     // Trigger fetch after state update (React batches these, so effect sees new state)
     setFilterTrigger(prev => prev + 1);
   };
@@ -185,34 +189,19 @@ export default function ReportManagementPage() {
         </header>
 
         <div className="flex-1 p-6 overflow-y-auto">
-          {/* Filters */}
+          {/* Filters Area */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4"> {/* Increase cols to 6 */}
-              {/* Use New Component */}
-              <div>
-                <label className="block text-sm text-zinc-400 mb-2">Filter Units</label>
-                <MultiSelectDropdown
-                  options={allUnits}
-                  selected={selectedUnits}
-                  onChange={setSelectedUnits}
-                  placeholder="Select Units"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-400 mb-2">Filter Categories</label>
-                <MultiSelectDropdown
-                  options={allCategories}
-                  selected={selectedCategories}
-                  onChange={setSelectedCategories}
-                  placeholder="Select Categories"
-                />
-              </div>
+
+            {/* PERUBAHAN 3: Grid Layout 6 Kolom agar presisi memenuhi layar */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+
+              {/* 1. Search Name */}
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Search Name</label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search by name..."
+                    placeholder="Search..."
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -220,33 +209,69 @@ export default function ReportManagementPage() {
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
                 </div>
               </div>
-              {/* 4. ADD DATE INPUT */}
+
+              {/* 2. Filter Units */}
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Filter by Date</label>
+                <label className="block text-sm text-zinc-400 mb-2">Units</label>
+                <MultiSelectDropdown
+                  options={allUnits}
+                  selected={selectedUnits}
+                  onChange={setSelectedUnits}
+                  placeholder="Select Units"
+                />
+              </div>
+
+              {/* 3. Filter Categories */}
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Categories</label>
+                <MultiSelectDropdown
+                  options={allCategories}
+                  selected={selectedCategories}
+                  onChange={setSelectedCategories}
+                  placeholder="Select Categories"
+                />
+              </div>
+
+              {/* 4. Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Start Date</label>
                 <input
                   type="date"
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
-              {/* 4. BUTTONS SECTION */}
-              <div className="flex items-end gap-2">
+
+              {/* 5. End Date */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">End Date</label>
+                <input
+                  type="date"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+
+              {/* 6. Buttons (Apply & Reset) */}
+              <div className="flex items-center gap-2 h-10"> {/* h-10 agar tinggi sama dengan input */}
                 <button
                   onClick={handleApplyFilters}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+                  className="flex-1 h-full flex items-center justify-center gap-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
                 >
                   <Filter className="h-4 w-4" />
                   Apply
                 </button>
                 <button
                   onClick={handleResetFilters}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg text-sm transition-colors"
+                  className="h-full px-4 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg text-sm transition-colors"
                   title="Reset Filters"
                 >
                   Reset
                 </button>
               </div>
+
             </div>
           </div>
 
@@ -261,7 +286,7 @@ export default function ReportManagementPage() {
                     <th className="pb-3">Officer</th>
                     <th className="pb-3">Unit</th>
                     <th className="pb-3">Category</th>
-                    <th className="pb-3">Specific Loc</th> {/* New Header */}
+                    <th className="pb-3">Specific Loc</th>
                     <th className="pb-3">Date/Time</th>
                     <th className="pb-3">Location</th>
                     <th className="pb-3">Status</th>
@@ -271,64 +296,20 @@ export default function ReportManagementPage() {
                 <tbody className="divide-y divide-zinc-800">
                   {reports.map((report: any) => (
                     <tr key={report.id} className="text-sm">
-                      <td className="py-3 font-medium text-white">
-                        {report.profiles?.full_name || 'N/A'}
-                      </td>
-                      <td className="py-3 text-zinc-300">
-                        {report.units?.name || 'N/A'}
-                      </td>
-
-                      {/* NEW COLORED CATEGORY COLUMN */}
-                      <td className="py-3">
-                        {report.report_categories && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            // Logic: Red (Unsafe) > Yellow > Green
-                            (report.report_categories.color === 'red' || report.report_categories.name.toLowerCase().includes('unsafe') || report.report_categories.name.toLowerCase().includes('tidak aman') || report.report_categories.name.toLowerCase().includes('bahaya'))
-                              ? 'bg-red-500/20 text-red-400'
-                              : report.report_categories.color === 'yellow' || report.report_categories.name.toLowerCase().includes('maintenance') || report.report_categories.name.toLowerCase().includes('perbaikan') || report.report_categories.name.toLowerCase().includes('warning')
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-green-500/20 text-green-400'
-                          }`}>
-                            {report.report_categories.name}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* NEW SPECIFIC LOCATION COLUMN */}
-                      <td className="py-3 text-zinc-300">
-                        {report.unit_locations?.name || '-'}
-                      </td>
-
-                      <td className="py-3 text-zinc-300">
-                        {new Date(report.captured_at).toLocaleString()}
-                      </td>
-                      <td className="py-3 text-zinc-300">
-                        {report.latitude && report.longitude
-                          ? `${report.latitude.toFixed(4)}, ${report.longitude.toFixed(4)}`
-                          : 'N/A'}
-                      </td>
-                      <td className="py-3">
-                        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full">
-                          Completed
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <button
-                          onClick={() => handleViewReport(report)}
-                          className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </button>
-                      </td>
+                      <td className="py-3 font-medium text-white">{report.profiles?.full_name || 'N/A'}</td>
+                      <td className="py-3 text-zinc-300">{report.units?.name || 'N/A'}</td>
+                      <td className="py-3">{report.report_categories && (<span className={`px-2 py-1 rounded-full text-xs font-medium ${(report.report_categories.color === 'red' || report.report_categories.name.toLowerCase().includes('unsafe') || report.report_categories.name.toLowerCase().includes('tidak aman') || report.report_categories.name.toLowerCase().includes('bahaya')) ? 'bg-red-500/20 text-red-400' : report.report_categories.color === 'yellow' || report.report_categories.name.toLowerCase().includes('maintenance') || report.report_categories.name.toLowerCase().includes('perbaikan') || report.report_categories.name.toLowerCase().includes('warning') ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>{report.report_categories.name}</span>)}</td>
+                      <td className="py-3 text-zinc-300">{report.unit_locations?.name || '-'}</td>
+                      <td className="py-3 text-zinc-300">{new Date(report.captured_at).toLocaleString()}</td>
+                      <td className="py-3 text-zinc-300">{report.latitude && report.longitude ? `${report.latitude.toFixed(4)}, ${report.longitude.toFixed(4)}` : 'N/A'}</td>
+                      <td className="py-3"><span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full">Completed</span></td>
+                      <td className="py-3"><button onClick={() => handleViewReport(report)} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm"><Eye className="h-4 w-4" />View</button></td>
                     </tr>
                   ))}
 
                   {reports.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-zinc-500">
-                        No reports found matching your criteria
-                      </td>
+                      <td colSpan={8} className="py-8 text-center text-zinc-500">No reports found matching your criteria</td>
                     </tr>
                   )}
                 </tbody>
