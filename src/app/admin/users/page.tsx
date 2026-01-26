@@ -52,50 +52,69 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder }: any) 
 export default function ManageUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [allUnits, setAllUnits] = useState<any[]>([]);
-  
+
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
-  const [filterTrigger, setFilterTrigger] = useState(0); // For Manual Trigger
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
 
-  // FETCH DATA
+  // PAGINATION STATES
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10; // Maximum 10 rows per page
+
+  // FETCH DATA WITH PAGINATION
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const queryParams = new URLSearchParams({
+        search: searchTerm,
+        units: selectedUnits.join(','), // Array to String
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      });
+
+      const response = await fetch(`/api/admin/users?${queryParams}`);
+      if (!response.ok) throw new Error('Failed to fetch users');
+
+      const data = await response.json();
+      setUsers(data.users);
+      setAllUnits(data.units);
+      setTotalPages(data.totalPages || 1);
+      setTotalCount(data.totalCount || 0);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Effect to fetch data when currentPage changes only
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const queryParams = new URLSearchParams({
-          search: searchTerm,
-          units: selectedUnits.join(','), // Array to String
-        });
-
-        const response = await fetch(`/api/admin/users?${queryParams}`);
-        if (!response.ok) throw new Error('Failed to fetch users');
-
-        const data = await response.json();
-        setUsers(data.users);
-        setAllUnits(data.units);
-      } catch (err) {
-        console.error(err);
-        setError('Failed to load users');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [filterTrigger]); // Only run when trigger updates
+  }, [currentPage]);
+
+  // Effect to fetch data once when component mounts
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // HANDLERS
-  const handleApplyFilters = () => setFilterTrigger(prev => prev + 1);
+  const handleApplyFilters = () => {
+    setCurrentPage(1); // Reset to first page when applying filters
+    fetchData(); // Explicitly fetch data when Apply is clicked
+  };
 
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedUnits([]);
-    setFilterTrigger(prev => prev + 1);
+    setCurrentPage(1); // Reset to first page when resetting filters
+    fetchData(); // Explicitly fetch data when Reset is clicked
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
@@ -119,7 +138,7 @@ export default function ManageUsersPage() {
       }
 
       // Refresh the user list
-      setFilterTrigger(prev => prev + 1);
+      await fetchData();
       setConfirmDelete(null);
     } catch (err: any) {
       console.error('Error deleting user:', err);
@@ -134,36 +153,45 @@ export default function ManageUsersPage() {
     setConfirmDelete(null);
   };
 
-  // 2. EXPORT FUNCTION LOGIC
-  const handleExport = () => {
-    if (users.length === 0) {
-      alert("Tidak ada data pengguna untuk diexport.");
-      return;
+  // 2. EXPORT FUNCTION LOGIC - Fetch all users for export
+  const handleExport = async () => {
+    try {
+      // Fetch all users (with a large limit to get everything)
+      const response = await fetch('/api/admin/users?limit=10000&page=1');
+      const data = await response.json();
+
+      if (!data.users || data.users.length === 0) {
+        alert("Tidak ada data pengguna untuk diexport.");
+        return;
+      }
+
+      // Mapping data agar sesuai dengan kolom Excel yang diinginkan
+      const dataToExport = data.users.map(user => ({
+        "Nama Lengkap": user.full_name || 'N/A',
+        "Username": user.username || 'N/A',
+        "Nomor Telepon": user.phone_number || '-',
+        "Unit": user.units?.name || '-',
+        "Peran": user.role || 'N/A',
+        "Tanggal Dibuat": new Date(user.created_at).toLocaleString('id-ID'),
+        "Email": user.email || '-',
+        "ID": user.id
+      }));
+
+      // Membuat Worksheet dan Workbook
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Daftar Pengguna");
+
+      // Auto-width columns (Sedikit styling biar rapi)
+      worksheet["!cols"] = [ { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 30 } ];
+
+      // Generate file name dengan timestamp
+      const timestamp = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(workbook, `Daftar_Pengguna_${timestamp}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting users:', error);
+      alert("Gagal melakukan export data pengguna.");
     }
-
-    // Mapping data agar sesuai dengan kolom Excel yang diinginkan
-    const dataToExport = users.map(user => ({
-      "Nama Lengkap": user.full_name || 'N/A',
-      "Username": user.username || 'N/A',
-      "Nomor Telepon": user.phone_number || '-',
-      "Unit": user.units?.name || '-',
-      "Peran": user.role || 'N/A',
-      "Tanggal Dibuat": new Date(user.created_at).toLocaleString('id-ID'),
-      "Email": user.email || '-',
-      "ID": user.id
-    }));
-
-    // Membuat Worksheet dan Workbook
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Daftar Pengguna");
-
-    // Auto-width columns (Sedikit styling biar rapi)
-    worksheet["!cols"] = [ { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 30 } ];
-
-    // Generate file name dengan timestamp
-    const timestamp = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(workbook, `Daftar_Pengguna_${timestamp}.xlsx`);
   };
 
   if (loading) {
@@ -277,7 +305,13 @@ export default function ManageUsersPage() {
 
           {/* TABLE SECTION */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <h2 className="text-lg font-bold mb-4">Users List</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">Users List</h2>
+              <div className="text-sm text-zinc-400">
+                Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalCount)} - {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} users
+              </div>
+            </div>
+
             {loading ? (
                <div className="text-center py-10 text-zinc-500">Loading users...</div>
             ) : (
@@ -329,6 +363,63 @@ export default function ManageUsersPage() {
                     )}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-zinc-400">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-1.5 rounded-lg ${currentPage === 1 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                      >
+                        Previous
+                      </button>
+
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          // Show all pages if total is 5 or less
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          // Show first 5 pages if current page is 1-3
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          // Show last 5 pages if current page is near the end
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          // Show current page in the middle
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 py-1.5 rounded-lg min-w-[36px] ${
+                              currentPage === pageNum
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-zinc-800 text-white hover:bg-zinc-700'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className={`px-3 py-1.5 rounded-lg ${currentPage === totalPages ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

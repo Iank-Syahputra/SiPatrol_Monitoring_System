@@ -18,9 +18,33 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 10); // Maximum 10 rows per page
+    const offset = (page - 1) * limit;
 
     // Parse Multi-Select Param
     const unitIds = searchParams.get('units')?.split(',').filter(Boolean) || [];
+
+    // 1. Count Query
+    let countQuery = supabaseAdmin
+      .from('profiles')
+      .select('*', { count: 'exact', head: true });
+
+    // 2. Apply Search (Name or Username)
+    if (search) {
+      countQuery = countQuery.or(`full_name.ilike.%${search}%,username.ilike.%${search}%`);
+    }
+
+    // 3. Apply Multi-Select Unit Filter
+    if (unitIds.length > 0) {
+      countQuery = countQuery.in('assigned_unit_id', unitIds);
+    }
+
+    const { count: totalUsers, error: countError } = await countQuery;
+    if (countError) throw countError;
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalUsers! / limit);
 
     // 1. Base Query
     let query = supabaseAdmin
@@ -29,7 +53,8 @@ export async function GET(request: NextRequest) {
         *,
         units (id, name)
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     // 2. Apply Search (Name or Username)
     if (search) {
@@ -47,7 +72,12 @@ export async function GET(request: NextRequest) {
     // 4. Fetch Units for Dropdown
     const { data: units } = await supabaseAdmin.from('units').select('id, name').order('name');
 
-    return NextResponse.json({ users, units });
+    return NextResponse.json({
+      users,
+      units,
+      totalPages,
+      totalCount: totalUsers || 0
+    });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
