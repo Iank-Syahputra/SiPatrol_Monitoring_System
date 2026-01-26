@@ -60,6 +60,7 @@ export default function ManageUsersPage() {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
 
   // FETCH DATA
   useEffect(() => {
@@ -90,11 +91,47 @@ export default function ManageUsersPage() {
 
   // HANDLERS
   const handleApplyFilters = () => setFilterTrigger(prev => prev + 1);
-  
+
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedUnits([]);
     setFilterTrigger(prev => prev + 1);
+  };
+
+  const handleDeleteUser = (userId: string, userName: string) => {
+    setConfirmDelete({ id: userId, name: userName });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!confirmDelete) return;
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`/api/admin/users/${confirmDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete user');
+      }
+
+      // Refresh the user list
+      setFilterTrigger(prev => prev + 1);
+      setConfirmDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      setError(err.message);
+      setTimeout(() => setError(null), 5000); // Clear error after 5 seconds
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDelete(null);
   };
 
   // 2. EXPORT FUNCTION LOGIC
@@ -276,7 +313,10 @@ export default function ManageUsersPage() {
                           <Link href={`/admin/users/${user.id}/edit`} className="text-blue-400 hover:text-blue-300">
                             <Edit className="h-4 w-4" />
                           </Link>
-                          <button className="text-red-400 hover:text-red-300">
+                          <button
+                            onClick={() => handleDeleteUser(user.id, user.full_name)}
+                            className="text-red-400 hover:text-red-300"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </td>
@@ -295,6 +335,33 @@ export default function ManageUsersPage() {
 
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-2 text-white">Confirm Delete</h3>
+            <p className="text-zinc-300 mb-6">
+              Are you sure you want to delete user <span className="font-semibold text-white">"{confirmDelete.name}"</span>?
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteUser}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

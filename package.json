@@ -42,6 +42,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@serwist/next": "^9.5.0",
     "@supabase/supabase-js": "^2.53.0",
+    "@types/recharts": "^1.8.29",
     "ai": "^4.3.19",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

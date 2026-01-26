@@ -1,92 +1,105 @@
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { auth } from '@clerk/nextjs/server';
-import { NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server'; // Or your auth provider
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
+  // 1. Auth Check
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // 2. Init Admin Client
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return NextResponse.json({ error: 'Server Config Error: Missing Service Key' }, { status: 500 });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+
+  const { searchParams } = new URL(request.url);
+  const startDate = searchParams.get('startDate');
+  const endDate = searchParams.get('endDate');
+
   try {
-    // Verify the user is authenticated
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // 3. Fetch Basic Counters (Global)
+    const { count: totalSecurity } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'security');
+    const { count: totalReports } = await supabase.from('reports').select('*', { count: 'exact', head: true });
+    const { count: totalUnits } = await supabase.from('units').select('*', { count: 'exact', head: true });
 
-    // Get Supabase client with service role key to bypass RLS
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    // Fetch latest reports
-    const { data: reports, error: reportsError } = await supabaseAdmin
+    // 4. Fetch Live Feed (Latest 5)
+    const { data: recentReports } = await supabase
       .from('reports')
-      .select(`
-        *,
-        profiles(full_name),
-        units(name),
-        report_categories(name, color),
-        unit_locations(name)
-      `)
+      .select('*, profiles(full_name), units(name), report_categories(name, color)')
       .order('captured_at', { ascending: false })
       .limit(5);
 
-    if (reportsError) {
-      console.error('Error fetching reports:', reportsError);
-      return Response.json({ error: reportsError.message }, { status: 500 });
-    }
-
-    // Fetch all units
-    const { data: units, error: unitsError } = await supabaseAdmin
-      .from('units')
-      .select('*');
-
-    if (unitsError) {
-      console.error('Error fetching units:', unitsError);
-      return Response.json({ error: unitsError.message }, { status: 500 });
-    }
-
-    // Calculate total security officers
-    const { count: securityCount, error: securityError } = await supabaseAdmin
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'security');
-
-    if (securityError) {
-      console.error('Error counting security officers:', securityError);
-      return Response.json({ error: securityError.message }, { status: 500 });
-    }
-
-    // Calculate total reports
-    const { count: reportCount, error: reportError } = await supabaseAdmin
+    // 5. Fetch RAW Data for Statistics (Single Query)
+    let statsQuery = supabase
       .from('reports')
-      .select('*', { count: 'exact', head: true });
+      .select(`
+        id, captured_at,
+        units (name),
+        report_categories (name)
+      `);
 
-    if (reportError) {
-      console.error('Error counting reports:', reportError);
-      return Response.json({ error: reportError.message }, { status: 500 });
+    // Apply Date Filter
+    if (startDate) statsQuery = statsQuery.gte('captured_at', `${startDate}T00:00:00`);
+    if (endDate) statsQuery = statsQuery.lte('captured_at', `${endDate}T23:59:59`);
+
+    const { data: rawData, error } = await statsQuery;
+    if (error) throw error;
+
+    // 6. Aggregate Data (In-Memory Calculation)
+    const globalStats = { safe_count: 0, unsafe_action_count: 0, unsafe_condition_count: 0 };
+    const unitStatsMap: Record<string, any> = {};
+
+    if (rawData) {
+      rawData.forEach((report: any) => {
+        const unitName = report.units?.name || 'Unknown Unit';
+        const category = report.report_categories?.name?.toLowerCase() || '';
+
+        // Init Unit
+        if (!unitStatsMap[unitName]) {
+          unitStatsMap[unitName] = {
+            unit_name: unitName,
+            total_reports: 0,
+            safe_count: 0,
+            unsafe_action_count: 0,
+            unsafe_condition_count: 0
+          };
+        }
+
+        // Increment Counts
+        unitStatsMap[unitName].total_reports++;
+
+        // Logic Matching (Flexible)
+        if (category.includes('aman') && !category.includes('tidak')) {
+          globalStats.safe_count++;
+          unitStatsMap[unitName].safe_count++;
+        } else if (category.includes('action') || category.includes('perilaku')) {
+          globalStats.unsafe_action_count++;
+          unitStatsMap[unitName].unsafe_action_count++;
+        } else if (category.includes('condition') || category.includes('kondisi')) {
+          globalStats.unsafe_condition_count++;
+          unitStatsMap[unitName].unsafe_condition_count++;
+        }
+      });
     }
 
-    // Calculate total units
-    const { count: unitCount, error: unitError } = await supabaseAdmin
-      .from('units')
-      .select('*', { count: 'exact', head: true });
+    // Sort Units by Total Reports (Highest First)
+    const unitStatsArray = Object.values(unitStatsMap).sort((a: any, b: any) => b.total_reports - a.total_reports);
 
-    if (unitError) {
-      console.error('Error counting units:', unitError);
-      return Response.json({ error: unitError.message }, { status: 500 });
-    }
-
-    return Response.json({
-      reports,
-      units,
-      stats: {
-        totalSecurity: securityCount || 0,
-        totalReports: reportCount || 0,
-        totalUnits: unitCount || 0
-      }
+    return NextResponse.json({
+      stats: { totalSecurity: totalSecurity || 0, totalReports: totalReports || 0, totalUnits: totalUnits || 0 },
+      reports: recentReports || [],
+      global_stats: globalStats,
+      unit_stats: unitStatsArray
     });
-  } catch (error) {
-    console.error('Unexpected error in dashboard API:', error);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
